@@ -1,0 +1,303 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 210 11% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 210 11% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 11% 15%;
+
+    --primary: 180 55% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 200 14% 24%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 210 11% 45%;
+
+    --accent: 200 14% 15%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 180 55% 55%;
+
+    --radius: 0.5rem;
+
+    /* Custom design tokens */
+    --gradient-hero: linear-gradient(135deg, hsl(180, 55%, 55%) 0%, hsl(180, 60%, 65%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(0, 0%, 100%) 0%, hsl(210, 40%, 98%) 100%);
+    --shadow-sm: 0 1px 2px 0 hsl(210 11% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(210 11% 15% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(210 11% 15% / 0.1);
+    --shadow-glow: 0 0 20px hsl(180 55% 55% / 0.3);
+  }
+
+  .dark {
+    --background: 218 19% 7%;
+    --foreground: 210 20% 98%;
+
+    --card: 200 14% 13%;
+    --card-foreground: 210 20% 98%;
+
+    --popover: 200 14% 13%;
+    --popover-foreground: 210 20% 98%;
+
+    --primary: 180 55% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 200 14% 24%;
+    --secondary-foreground: 210 20% 98%;
+
+    --muted: 200 14% 20%;
+    --muted-foreground: 210 20% 70%;
+
+    --accent: 200 14% 15%;
+    --accent-foreground: 210 20% 98%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 210 20% 98%;
+
+    --border: 200 14% 20%;
+    --input: 200 14% 20%;
+    --ring: 180 55% 55%;
+
+    /* Dark mode custom tokens */
+    --gradient-hero: linear-gradient(135deg, hsl(180, 55%, 45%) 0%, hsl(180, 55%, 55%) 100%);
+    --gradient-card: linear-gradient(135deg, hsl(200, 14%, 13%) 0%, hsl(200, 14%, 18%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(180, 55%, 55%) 0%, hsl(180, 60%, 65%) 100%);
+    --shadow-sm: 0 1px 2px 0 hsl(180 55% 55% / 0.1);
+    --shadow-md: 0 4px 6px -1px hsl(180 55% 55% / 0.15);
+    --shadow-lg: 0 10px 15px -3px hsl(180 55% 55% / 0.2);
+    --shadow-glow: 0 0 30px hsl(180 55% 55% / 0.4);
+    --shadow-glow-lg: 0 0 50px hsl(180 55% 55% / 0.3);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Focus styles for accessibility - Enhanced with better visibility */
+  *:focus-visible {
+    outline: 3px solid hsl(var(--primary) / 0.5);
+    outline-offset: 2px;
+    transition: outline-color 0.15s ease-in-out;
+  }
+
+  /* Ensure focus is visible on interactive elements */
+  button:focus-visible,
+  a:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 3px solid hsl(var(--primary) / 0.6);
+    outline-offset: 3px;
+  }
+
+  /* Typography improvements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold leading-tight tracking-tight;
+  }
+
+  p {
+    @apply leading-relaxed;
+  }
+}
+
+@layer components {
+  /* ============= Existing Card Styles ============= */
+  .card {
+    @apply bg-card text-card-foreground rounded-lg border border-border shadow-sm p-6;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-glow hover:border-primary/30;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold leading-tight mb-2;
+  }
+
+  .card-body {
+    @apply text-base leading-relaxed;
+  }
+
+  /* Interactive elements */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-all duration-150 ease-in-out;
+  }
+
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/90 focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 transition-all duration-150 ease-in-out;
+  }
+
+  /* Glass morphism effect */
+  .glass {
+    @apply bg-card/50 backdrop-blur-md border border-border/50;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent;
+  }
+
+  /* Animations */
+  @media (prefers-reduced-motion: no-preference) {
+    .hover-lift {
+      @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg;
+    }
+
+    .hover-scale {
+      @apply transition-transform duration-200 ease-out hover:scale-105;
+    }
+
+    .hover-glow {
+      @apply transition-all duration-300 hover:shadow-glow;
+    }
+  }
+
+  /* Page sections */
+  .section-container {
+    @apply container mx-auto px-4 sm:px-6 py-12 lg:py-20;
+  }
+
+  /* Empty states */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-12 text-center space-y-4;
+  }
+
+  /* ============= Extended Component Utilities ============= */
+  
+  /* Layout Utilities */
+  .page-container {
+    @apply min-h-screen bg-background;
+  }
+
+  .content-wrapper {
+    @apply container mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8;
+  }
+
+  .section-header {
+    @apply mb-8 space-y-2;
+  }
+
+  .section-title {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .section-description {
+    @apply text-muted-foreground text-lg;
+  }
+
+  /* Card Variations */
+  .card-premium {
+    @apply card bg-gradient-card border-primary/20 shadow-glow;
+  }
+
+  .card-interactive {
+    @apply card card-hover cursor-pointer;
+  }
+
+  .card-glass {
+    @apply glass rounded-lg p-6 shadow-md;
+  }
+
+  /* Form Elements */
+  .form-group {
+    @apply space-y-2;
+  }
+
+  .form-label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .form-input {
+    @apply flex h-10 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm 
+           ring-offset-background transition-colors
+           file:border-0 file:bg-transparent file:text-sm file:font-medium
+           placeholder:text-muted-foreground 
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 
+           disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Button Variations */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-lg {
+    @apply h-12 px-8 text-base;
+  }
+
+  .btn-md {
+    @apply h-10 px-6 text-sm;
+  }
+
+  .btn-sm {
+    @apply h-8 px-4 text-xs;
+  }
+
+  /* Data Display */
+  .data-grid {
+    @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .data-row {
+    @apply flex items-center justify-between py-3 border-b border-border last:border-0;
+  }
+
+  .stat-card {
+    @apply card p-6 space-y-2;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold gradient-text;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
+           hover:bg-accent hover:text-accent-foreground
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary;
+  }
+
+  .nav-link-active {
+    @apply nav-link bg-primary/10 text-primary;
+  }
+}
+
+@layer utilities {
+  /* Skeleton loaders */
+  .skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+
+  /* Text utilities */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
