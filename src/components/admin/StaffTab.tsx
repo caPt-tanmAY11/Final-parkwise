@@ -86,8 +86,8 @@ export default function StaffTab() {
   const fetchStaff = async (managerCentreId?: string) => {
     try {
       let query = supabase
-        .from("staff")
-        .select("*, parking_centres(name)")
+        .from("view_staff_details")
+        .select("*")
         .order("hired_date", { ascending: false });
       
       // If manager, filter by their centre
