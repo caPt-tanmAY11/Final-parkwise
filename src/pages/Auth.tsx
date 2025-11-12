@@ -240,14 +240,6 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        {/* Info Alert */}
-        <Alert className="animate-fade-in" style={{ animationDelay: "200ms" }}>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            Email confirmation is disabled for easy testing. Simply sign up and you'll be logged in automatically.
-          </AlertDescription>
-        </Alert>
-
         {/* Back to Home */}
         <Button
           variant="ghost"
