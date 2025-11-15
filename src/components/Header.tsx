@@ -30,17 +30,17 @@ export default function Header() {
       <div className="container mx-auto px-4 sm:px-6 py-4">
         <div className="flex justify-between items-center">
           {/* Logo */}
-          <div 
-            className="flex items-center gap-3 cursor-pointer group" 
+          <div
+            className="flex items-center gap-3 cursor-pointer group"
             onClick={() => navigate("/")}
           >
-            <div 
-              className="flex items-center gap-3 cursor-pointer group" 
+            <div
+              className="flex items-center gap-3 cursor-pointer group"
               onClick={() => navigate("/")}
             >
-              <img 
-                src={logo} 
-                alt="ParkWise Logo" 
+              <img
+                src={logo}
+                alt="ParkWise Logo"
                 className="h-10 w-10 rounded-xl object-cover group-hover:scale-110 transition-transform"
               />
             </div>
@@ -65,7 +65,7 @@ export default function Header() {
           {/* Actions */}
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            
+
             {isAuthenticated ? (
               <>
                 {hasRole('admin') && (
@@ -79,19 +79,7 @@ export default function Header() {
                     Admin
                   </Button>
                 )}
-                
-                {hasRole('manager') && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate("/manager")}
-                    className="gap-2"
-                  >
-                    <Shield className="h-4 w-4" />
-                    Manager
-                  </Button>
-                )}
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -101,8 +89,8 @@ export default function Header() {
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Button>
-                
-                {!hasRole('attendant') && (
+
+                {(!hasRole('attendant')) && (!hasRole('manager')) && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -113,7 +101,7 @@ export default function Header() {
                     Support
                   </Button>
                 )}
-                
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -172,10 +160,10 @@ export default function Header() {
                   {link.label}
                 </a>
               ))}
-              
+
               <div className="flex items-center gap-2 pt-4 border-t border-border/50">
                 <ThemeToggle />
-                
+
                 {isAuthenticated ? (
                   <div className="flex flex-col gap-2 w-full">
                     {hasRole('admin') && (
@@ -192,7 +180,7 @@ export default function Header() {
                         Admin
                       </Button>
                     )}
-                    
+
                     {hasRole('manager') && (
                       <Button
                         variant="outline"
@@ -207,7 +195,7 @@ export default function Header() {
                         Manager
                       </Button>
                     )}
-                    
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -220,7 +208,7 @@ export default function Header() {
                       <LayoutDashboard className="h-4 w-4" />
                       Dashboard
                     </Button>
-                    
+
                     {!hasRole('attendant') && (
                       <Button
                         variant="ghost"
@@ -235,7 +223,7 @@ export default function Header() {
                         Support
                       </Button>
                     )}
-                    
+
                     <Button
                       variant="ghost"
                       size="sm"

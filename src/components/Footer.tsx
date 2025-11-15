@@ -5,7 +5,7 @@ const Footer = () => {
     <footer className="border-t border-border/50 bg-gradient-to-b from-background to-accent/5 py-12">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-            <div>
+          <div>
             <h3 className="text-xl font-bold mb-4 gradient-text">ParkWise</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
               Smart parking solutions for modern cities. Follow us for updates.
@@ -31,9 +31,10 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4">CONTACT US</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>+91 22 4567 8901</li>
-              <li>+91 22 4567 8902</li>
-              <li>hello@parkwise.in</li>
+              <li>+91 9321699208</li>
+              <li>+91 9820423528</li>
+              <li>+91 9321458108</li>
+              <li>parkwise@gmail.com</li>
             </ul>
           </div>
 
@@ -64,7 +65,7 @@ const Footer = () => {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>ADDRESS</span>
               <span className="text-xs">•</span>
-              <span>3rd Floor, Nariman Point, Mumbai, Maharashtra 400021, India</span>
+              <span>6th floor, SPIT, Andheri, Mumbai, Maharashtra 400021, India</span>
             </div>
 
             <div className="flex items-center gap-4">
@@ -92,6 +93,12 @@ const Footer = () => {
               >
                 <Twitter className="w-4 h-4" />
               </a>
+            </div>
+          </div>
+          <div className="text-white flex justify-center items-center my-4">
+            <div className="flex flex-col justify-center items-center text-sm">
+              <p>Made with &#9829;</p>
+              <p>by Deven, Param, Tanmay</p>
             </div>
           </div>
         </div>

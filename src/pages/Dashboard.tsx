@@ -24,41 +24,63 @@ const supabase = rawSupabase as any;
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, signOut, isAuthenticated, loading: authLoading, hasRole } = useAuth();
+
+  // NOTE: don't expect setProfile from context unless your AuthContext provides it.
+  // If your AuthContext exposes refreshProfile(), we'll call it after saving.
+  const { profile, signOut, isAuthenticated, loading: authLoading, hasRole, refreshProfile } = useAuth();
+
+  // Local copy of profile so we can update UI without needing a setProfile in context
+  const [currentProfile, setCurrentProfile] = useState(profile || null);
+
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+  });
+
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [activeBookings, setActiveBookings] = useState<any[]>([]);
   const [vehicleCount, setVehicleCount] = useState(0);
   const [activeMembership, setActiveMembership] = useState<any>(null);
+
+  // sync local currentProfile and formData when context profile changes
+  useEffect(() => {
+    setCurrentProfile(profile || null);
+    setFormData({
+      full_name: profile?.full_name || "",
+      email: profile?.email || "",
+      phone: profile?.phone || "",
+    });
+  }, [profile]);
 
   useEffect(() => {
     if (!isAuthenticated && !authLoading) {
       navigate("/auth");
       return;
     }
-    
-    // Redirect managers to their dashboard
+
+    // Redirect role-based dashboards
     if (isAuthenticated && hasRole && hasRole('manager')) {
       navigate("/manager");
       return;
     }
-    
-    // Redirect attendants to their dashboard
     if (isAuthenticated && hasRole && hasRole('attendant')) {
       navigate("/attendant");
       return;
     }
-    
-    // Redirect admins to admin dashboard
     if (isAuthenticated && hasRole && hasRole('admin')) {
       navigate("/admin");
       return;
     }
-    
-    if (isAuthenticated && profile) {
+
+    if (isAuthenticated && currentProfile) {
       fetchDashboardData();
     }
-  }, [isAuthenticated, authLoading, navigate, profile, hasRole]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, authLoading, navigate, currentProfile, hasRole]);
 
   const fetchDashboardData = async () => {
     try {
@@ -66,11 +88,11 @@ export default function Dashboard() {
       const { data: bookingsData, error: bookingsError } = await supabase
         .from("bookings")
         .select(`
-          *,
+          * ,
           vehicles(vehicle_number, vehicle_model, vehicle_type),
           parking_slots(slot_number)
         `)
-        .eq("user_id", profile?.id)
+        .eq("user_id", currentProfile?.id)
         .in('status', ['pending', 'active'])
         .order('booking_start', { ascending: false });
 
@@ -81,7 +103,7 @@ export default function Dashboard() {
       const { data: pointsData, error: pointsError } = await supabase
         .from("loyalty_points")
         .select("points")
-        .eq("user_id", profile?.id)
+        .eq("user_id", currentProfile?.id)
         .single();
 
       if (pointsError && pointsError.code !== 'PGRST116') throw pointsError;
@@ -91,7 +113,7 @@ export default function Dashboard() {
       const { count, error: vehicleError } = await supabase
         .from("vehicles")
         .select("*", { count: 'exact', head: true })
-        .eq("user_id", profile?.id);
+        .eq("user_id", currentProfile?.id);
 
       if (vehicleError) throw vehicleError;
       setVehicleCount(count || 0);
@@ -100,7 +122,7 @@ export default function Dashboard() {
       const { data: membershipData, error: membershipError } = await supabase
         .from("user_memberships")
         .select("*, membership_plans(*)")
-        .eq("user_id", profile?.id)
+        .eq("user_id", currentProfile?.id)
         .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(1)
@@ -108,7 +130,6 @@ export default function Dashboard() {
 
       if (membershipError && membershipError.code !== 'PGRST116') throw membershipError;
       setActiveMembership(membershipData);
-
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Failed to load dashboard data");
@@ -119,7 +140,7 @@ export default function Dashboard() {
 
   // Set up real-time subscriptions for booking updates
   useEffect(() => {
-    if (!profile?.id) return;
+    if (!currentProfile?.id) return;
 
     const channel = supabase
       .channel('user-bookings-updates')
@@ -129,7 +150,7 @@ export default function Dashboard() {
           event: '*',
           schema: 'public',
           table: 'bookings',
-          filter: `user_id=eq.${profile.id}`
+          filter: `user_id=eq.${currentProfile.id}`
         },
         (payload) => {
           console.log('Booking changed:', payload);
@@ -142,12 +163,66 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProfile?.id]);
 
   const handleLogout = async () => {
     await signOut();
     toast.success("Logged out successfully");
     navigate("/");
+  };
+
+  // Save profile updates to Supabase
+  const saveProfile = async () => {
+    if (!currentProfile?.id) {
+      toast.error("Unable to update profile: missing user id.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          full_name: formData.full_name,
+          email: formData.email,
+          phone: formData.phone,
+          updated_at: new Date(),
+        })
+        .eq("id", currentProfile.id);
+
+      if (error) throw error;
+
+      // Update local UI state
+      const updatedLocal = {
+        ...currentProfile,
+        full_name: formData.full_name,
+        email: formData.email,
+        phone: formData.phone,
+      };
+      setCurrentProfile(updatedLocal);
+
+      // If your AuthContext provides a refreshProfile() method, call it to sync context
+      try {
+        if (typeof refreshProfile === "function") {
+          await refreshProfile();
+        }
+      } catch (e) {
+        // ignore refresh errors, we already updated local state
+        console.warn("refreshProfile failed:", e);
+      }
+
+      toast.success("Profile updated successfully!");
+      setEditing(false);
+      // Re-fetch dashboard data (optional but keeps things fresh)
+      fetchDashboardData();
+    } catch (e) {
+      console.error("Failed to update profile:", e);
+      toast.error("Failed to update profile");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tier = getTierByPoints(loyaltyPoints);
@@ -179,7 +254,7 @@ export default function Dashboard() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-4xl md:text-6xl font-bold mb-2 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                Welcome back, {profile?.full_name?.split(' ')[0] || 'User'}!
+                Welcome back, {currentProfile?.full_name?.split(' ')[0] || 'User'}!
               </h1>
               <p className="text-lg text-muted-foreground">
                 Manage your parking bookings and vehicles
@@ -204,7 +279,7 @@ export default function Dashboard() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <span className="text-primary font-bold text-lg">
-                    {profile?.full_name?.charAt(0).toUpperCase() || 'U'}
+                    {currentProfile?.full_name?.charAt(0)?.toUpperCase() || 'U'}
                   </span>
                 </div>
                 Profile
@@ -213,15 +288,62 @@ export default function Dashboard() {
             <CardContent className="space-y-2">
               <div>
                 <p className="text-sm text-muted-foreground">Name</p>
-                <p className="font-medium">{profile?.full_name || 'Not set'}</p>
+                {editing ? (
+                  <input
+                    className="w-full border rounded px-3 py-2"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                  />
+                ) : (
+                  <p className="font-medium">{currentProfile?.full_name || 'Not set'}</p>
+                )}
               </div>
+
               <div>
                 <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium">{profile?.email || 'Not set'}</p>
+                {editing ? (
+                  <input
+                    className="w-full border rounded px-3 py-2"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                ) : (
+                  <p className="font-medium">{currentProfile?.email || 'Not set'}</p>
+                )}
               </div>
+
               <div>
                 <p className="text-sm text-muted-foreground">Phone</p>
-                <p className="font-medium">{profile?.phone || 'Not set'}</p>
+                {editing ? (
+                  <input
+                    className="w-full border rounded px-3 py-2"
+                    value={formData.phone || ""}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                ) : (
+                  <p className="font-medium">{currentProfile?.phone || 'Not set'}</p>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                {!editing ? (
+                  <Button size="sm" onClick={() => setEditing(true)}>Edit</Button>
+                ) : (
+                  <>
+                    <Button size="sm" onClick={saveProfile}>Save</Button>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      // reset edits back to currentProfile values
+                      setFormData({
+                        full_name: currentProfile?.full_name || "",
+                        email: currentProfile?.email || "",
+                        phone: currentProfile?.phone || "",
+                      });
+                      setEditing(false);
+                    }}>
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

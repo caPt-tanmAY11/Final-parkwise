@@ -232,6 +232,7 @@ const Bookings = () => {
           booking_end: bookingEnd,
           total_hours: hours,
           status: "active",
+          points_used: pointsToRedeem,
         })
         .select()
         .single();
@@ -268,26 +269,6 @@ const Bookings = () => {
       if (paymentError) {
         console.error("Payment error:", paymentError);
         throw paymentError;
-      }
-
-      // Award loyalty points (10% of booking amount) and deduct redeemed points
-      const pointsToEarn = Math.floor(baseAmount * 0.1); // 10% of base amount as points
-      const currentPoints = loyaltyPoints?.points || 0;
-      const currentTotalEarned = loyaltyPoints?.total_earned || 0;
-      const currentTotalRedeemed = loyaltyPoints?.total_redeemed || 0;
-
-      const { error: pointsError } = await supabase
-        .from("loyalty_points")
-        .update({
-          points: currentPoints - pointsToRedeem + pointsToEarn,
-          total_earned: currentTotalEarned + pointsToEarn,
-          total_redeemed: currentTotalRedeemed + pointsToRedeem,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", user.id);
-
-      if (pointsError) {
-        console.error("Points update error:", pointsError);
       }
 
       const tokenCode = `PKW-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
