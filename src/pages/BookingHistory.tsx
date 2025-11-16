@@ -3,135 +3,121 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase as rawSupabase } from "@/integrations/supabase/client";
 const supabase = rawSupabase as any;
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
+import Header from "@/components/Header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import Header from "@/components/Header";
-import { Calendar, MapPin, Car, Clock, CreditCard, QrCode, Filter, X, TrendingUp, DollarSign } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BookingCard } from "@/components/shared/BookingCard";
-import { LoadingState } from "@/components/shared/LoadingState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadingState } from "@/components/shared/LoadingState";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+import { Calendar, Filter, X, DollarSign } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { toast } from "sonner";
 
 interface Booking {
-  id: string;
+  booking_id: string;
+  user_id: string;
   booking_start: string;
   booking_end: string;
   status: string;
   total_hours: number;
-  vehicles?: { vehicle_number: string; vehicle_type: string };
-  parking_slots?: {
-    slot_number: string;
-    parking_zones?: {
-      zone_name: string;
-      floor_number: number;
-      parking_centres?: {
-        name: string;
-        address: string;
-        city: string;
-      };
-    };
-  };
-  payments?: { amount: number; payment_status: string }[];
-  tokens?: any; // Can be array or single object from database
+
+  vehicle_number: string;
+  vehicle_type: string;
+
+  slot_number: string;
+  zone_name: string;
+  floor_number: number;
+
+  centre_name: string;
+  centre_address: string;
+  centre_city: string;
+
+  amount: number;
+  payment_status: string;
+
+  token_code: string | null;
+  qr_data: string | null;
 }
 
 export default function BookingHistory() {
   const navigate = useNavigate();
   const { profile } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [filteredBookings, setFilteredBookings] = useState<Booking[]>([]);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
   const [showQRDialog, setShowQRDialog] = useState(false);
-  
-  // Filter states
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const [statusFilter, setStatusFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<string>("date-desc");
+  const [sortBy, setSortBy] = useState("date-desc");
 
-const fetchBookings = async () => {
-  if (!profile?.id) return;
+  const fetchBookings = async () => {
+    if (!profile?.id) return;
 
-  try {
-    const { data, error } = await supabase
-      .from("bookings")
-      .select(`
-        *,
-        vehicles(vehicle_number, vehicle_type),
-        parking_slots(
-          slot_number,
-          parking_zones(
-            zone_name,
-            floor_number,
-            parking_centres(name, address, city)
-          )
-        ),
-        payments(amount, payment_status),
-        tokens(token_code, qr_data, is_used)
-      `)
-      .eq("user_id", profile?.id)
- // ✅ only this user's bookings
-      .order("booking_start", { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from("perfect_booking_view")
+        .select("*")
+        .eq("user_id", profile.id)
+        .order("booking_start", { ascending: false });
 
-    if (error) throw error;
-    setBookings(data || []);
-    setFilteredBookings(data || []);
-  } catch (error) {
-    console.error("Error fetching bookings:", error);
-    toast.error("Failed to load booking history");
-  } finally {
-    setLoading(false);
-  }
-};
+      if (error) throw error;
+
+      setBookings(data || []);
+      setFilteredBookings(data || []);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load bookings");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-  if (profile?.id) {
-    fetchBookings();
-  }
-}, [profile]);
+    if (profile?.id) fetchBookings();
+  }, [profile]);
 
-
-  // Apply filters
+  // FILTERING + SORTING
   useEffect(() => {
-    let filtered = [...bookings];
+    let f = [...bookings];
 
-    // Status filter
     if (statusFilter !== "all") {
-      filtered = filtered.filter(b => b.status === statusFilter);
+      f = f.filter(b => b.status === statusFilter);
     }
 
-    // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(b => 
-        b.vehicles?.vehicle_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.parking_slots?.parking_zones?.parking_centres?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        b.parking_slots?.slot_number.toLowerCase().includes(searchQuery.toLowerCase())
+      const q = searchQuery.toLowerCase();
+      f = f.filter(b =>
+        b.vehicle_number.toLowerCase().includes(q) ||
+        b.slot_number.toLowerCase().includes(q) ||
+        b.centre_name.toLowerCase().includes(q)
       );
     }
 
-    // Sort
-    filtered.sort((a, b) => {
+    f.sort((a, b) => {
       switch (sortBy) {
         case "date-desc":
           return new Date(b.booking_start).getTime() - new Date(a.booking_start).getTime();
         case "date-asc":
           return new Date(a.booking_start).getTime() - new Date(b.booking_start).getTime();
         case "amount-desc":
-          return (b.payments?.[0]?.amount || 0) - (a.payments?.[0]?.amount || 0);
+          return (b.amount || 0) - (a.amount || 0);
         case "amount-asc":
-          return (a.payments?.[0]?.amount || 0) - (b.payments?.[0]?.amount || 0);
+          return (a.amount || 0) - (b.amount || 0);
         default:
           return 0;
       }
     });
 
-    setFilteredBookings(filtered);
+    setFilteredBookings(f);
   }, [bookings, statusFilter, searchQuery, sortBy]);
 
   const clearFilters = () => {
@@ -140,27 +126,15 @@ const fetchBookings = async () => {
     setSortBy("date-desc");
   };
 
-  // Calculate stats
   const stats = {
     total: bookings.length,
     completed: bookings.filter(b => b.status === "completed").length,
     active: bookings.filter(b => b.status === "active").length,
-    totalSpent: bookings.reduce((sum, b) => sum + (b.payments?.[0]?.amount || 0), 0),
+    totalSpent: bookings.reduce((sum, b) => sum + (b.amount || 0), 0),
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending": return "bg-yellow-500/10 text-yellow-500 border-yellow-500/30";
-      case "confirmed": return "bg-blue-500/10 text-blue-500 border-blue-500/30";
-      case "active": return "bg-green-500/10 text-green-500 border-green-500/30";
-      case "completed": return "bg-gray-500/10 text-gray-500 border-gray-500/30";
-      case "cancelled": return "bg-red-500/10 text-red-500 border-red-500/30";
-      default: return "bg-gray-500/10 text-gray-500 border-gray-500/30";
-    }
-  };
-
-  const showQRCode = (tokenCode: string) => {
-    setSelectedToken(tokenCode);
+  const showQRCode = (token: string) => {
+    setSelectedToken(token);
     setShowQRDialog(true);
   };
 
@@ -176,50 +150,20 @@ const fetchBookings = async () => {
   return (
     <div className="min-h-screen bg-background">
       <Header />
+
       <main className="container mx-auto px-4 pt-24 pb-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Booking History</h1>
-          <p className="text-muted-foreground">View all your past and current bookings</p>
+          <p className="text-muted-foreground">View your past and current bookings</p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats */}
         {bookings.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-500">{stats.completed}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-500">{stats.active}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Spent</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">₹{stats.totalSpent.toFixed(2)}</div>
-              </CardContent>
-            </Card>
+            <Card><CardHeader className="pb-3"><CardTitle>Total Bookings</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent></Card>
+            <Card><CardHeader className="pb-3"><CardTitle>Completed</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-500">{stats.completed}</div></CardContent></Card>
+            <Card><CardHeader className="pb-3"><CardTitle>Active</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-blue-500">{stats.active}</div></CardContent></Card>
+            <Card><CardHeader className="pb-3"><CardTitle>Total Spent</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">₹{stats.totalSpent.toFixed(2)}</div></CardContent></Card>
           </div>
         )}
 
@@ -227,29 +171,22 @@ const fetchBookings = async () => {
         {bookings.length > 0 && (
           <Card className="mb-6">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5" />
-                  <CardTitle>Filters</CardTitle>
-                </div>
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2"><Filter className="h-5 w-5" /><CardTitle>Filters</CardTitle></div>
                 {(statusFilter !== "all" || searchQuery || sortBy !== "date-desc") && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-2" />
-                    Clear Filters
-                  </Button>
+                  <Button variant="ghost" size="sm" onClick={clearFilters}><X className="h-4 w-4 mr-2" />Clear</Button>
                 )}
               </div>
             </CardHeader>
+
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label>Status</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
@@ -258,82 +195,66 @@ const fetchBookings = async () => {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label>Sort By</Label>
                   <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="date-desc">Date (Newest First)</SelectItem>
-                      <SelectItem value="date-asc">Date (Oldest First)</SelectItem>
-                      <SelectItem value="amount-desc">Amount (High to Low)</SelectItem>
-                      <SelectItem value="amount-asc">Amount (Low to High)</SelectItem>
+                      <SelectItem value="date-desc">Newest First</SelectItem>
+                      <SelectItem value="date-asc">Oldest First</SelectItem>
+                      <SelectItem value="amount-desc">Amount High → Low</SelectItem>
+                      <SelectItem value="amount-asc">Amount Low → High</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                <div>
                   <Label>Search</Label>
-                  <Input
-                    placeholder="Vehicle, location, slot..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                  <Input placeholder="Vehicle, slot, centre..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Content */}
         {bookings.length === 0 ? (
           <EmptyState
             icon={Calendar}
             title="No bookings yet"
-            description="Start by booking your first parking spot"
-            actionLabel="Book Parking"
+            description="Start by booking your first slot"
+            actionLabel="Book Now"
             onAction={() => navigate("/bookings")}
           />
         ) : filteredBookings.length === 0 ? (
           <EmptyState
             icon={Filter}
-            title="No bookings match your filters"
+            title="No matching bookings"
+            description="Try different filters"
             actionLabel="Clear Filters"
             onAction={clearFilters}
           />
         ) : (
           <div className="space-y-4">
-            {filteredBookings.map((booking) => (
-              <BookingCard
-                key={booking.id}
-                booking={booking}
-                onShowQR={showQRCode}
-              />
+            {filteredBookings.map(b => (
+              <BookingCard key={b.booking_id} booking={b} onShowQR={showQRCode} />
             ))}
           </div>
         )}
       </main>
 
+      {/* QR Modal */}
       <Dialog open={showQRDialog} onOpenChange={setShowQRDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Parking Token QR Code</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center justify-center py-8">
+          <DialogHeader><DialogTitle>Parking QR Code</DialogTitle></DialogHeader>
+
+          <div className="flex flex-col items-center py-6">
             {selectedToken && (
               <>
-                <div className="p-6 bg-white rounded-lg mb-4">
-                  <QRCodeSVG 
-                    value={selectedToken} 
-                    size={200}
-                    level="H"
-                    includeMargin={true}
-                  />
+                <div className="p-4 bg-white rounded-md">
+                  <QRCodeSVG value={selectedToken} size={200} level="H" />
                 </div>
-                <p className="font-mono font-bold text-xl text-primary mb-2">{selectedToken}</p>
-                <p className="text-sm text-muted-foreground text-center">
-                  Show this QR code at the parking entrance
-                </p>
+                <p className="font-mono text-lg mt-4">{selectedToken}</p>
               </>
             )}
           </div>

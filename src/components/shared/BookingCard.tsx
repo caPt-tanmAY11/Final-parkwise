@@ -6,33 +6,28 @@ import { cn } from "@/lib/utils";
 
 interface BookingCardProps {
   booking: {
-    id: string;
+    booking_id: string;
     status: string;
     booking_start: string;
     booking_end: string;
     total_hours?: number;
-    vehicles?: {
-      vehicle_number: string;
-      vehicle_type: string;
-      vehicle_model?: string;
-    };
-    parking_slots?: {
-      slot_number: string;
-      parking_zones?: {
-        zone_name: string;
-        floor_number: number;
-        parking_centres?: {
-          name: string;
-          address?: string;
-          city?: string;
-        };
-      };
-    };
-    payments?: Array<{
-      amount: number;
-      payment_status: string;
-    }>;
-    tokens?: any;
+
+    vehicle_number: string;
+    vehicle_type: string;
+
+    slot_number: string;
+    zone_name: string;
+    floor_number: number;
+
+    centre_name: string;
+    centre_address?: string;
+    centre_city?: string;
+
+    amount: number;
+    payment_status: string;
+
+    token_code?: string;
+    qr_data?: string;
   };
   onViewDetails?: () => void;
   onShowQR?: (tokenCode: string) => void;
@@ -51,39 +46,39 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
     }
   };
 
-  const tokenCode = Array.isArray(booking.tokens) 
-    ? booking.tokens[0]?.token_code 
-    : booking.tokens?.token_code;
+  const tokenCode = booking.token_code;
 
   return (
     <Card className={cn("hover:shadow-lg transition-all", className)}>
       <CardContent className="p-4 sm:p-6">
-        {/* Header with Centre Name and Status */}
+        
+        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base sm:text-lg font-semibold truncate">
-                {booking.parking_slots?.parking_zones?.parking_centres?.name || "Unknown Centre"}
+                {booking.centre_name || "Unknown Centre"}
               </h3>
               <Badge className={cn("text-xs", getStatusColor(booking.status))}>
                 {booking.status}
               </Badge>
             </div>
-            {booking.parking_slots?.parking_zones?.parking_centres?.address && (
+
+            {booking.centre_address && (
               <p className="text-xs sm:text-sm text-muted-foreground flex items-start gap-1">
                 <MapPin className="h-3 w-3 sm:h-4 sm:w-4 mt-0.5 flex-shrink-0" />
                 <span className="line-clamp-1">
-                  {booking.parking_slots.parking_zones.parking_centres.address}
-                  {booking.parking_slots.parking_zones.parking_centres.city && 
-                    `, ${booking.parking_slots.parking_zones.parking_centres.city}`}
+                  {booking.centre_address}
+                  {booking.centre_city && `, ${booking.centre_city}`}
                 </span>
               </p>
             )}
           </div>
         </div>
 
-        {/* Booking Details Grid */}
+        {/* Details Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
+
           {/* Vehicle */}
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
@@ -91,12 +86,8 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Vehicle</p>
-              <p className="font-medium text-sm truncate">{booking.vehicles?.vehicle_number || "N/A"}</p>
-              {booking.vehicles?.vehicle_model && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {booking.vehicles.vehicle_model}
-                </p>
-              )}
+              <p className="font-medium text-sm truncate">{booking.vehicle_number || "N/A"}</p>
+              <p className="text-xs text-muted-foreground truncate">{booking.vehicle_type}</p>
             </div>
           </div>
 
@@ -107,12 +98,10 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Parking Slot</p>
-              <p className="font-medium text-sm">Slot {booking.parking_slots?.slot_number || "N/A"}</p>
-              {booking.parking_slots?.parking_zones && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {booking.parking_slots.parking_zones.zone_name}, Floor {booking.parking_slots.parking_zones.floor_number}
-                </p>
-              )}
+              <p className="font-medium text-sm">Slot {booking.slot_number || "N/A"}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {booking.zone_name}, Floor {booking.floor_number}
+              </p>
             </div>
           </div>
 
@@ -123,7 +112,7 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">Duration</p>
-              <p className="font-medium text-sm">{booking.total_hours?.toFixed(1) || "N/A"} hours</p>
+              <p className="font-medium text-sm">{booking.total_hours || "N/A"} hours</p>
               <p className="text-xs text-muted-foreground">
                 {new Date(booking.booking_start).toLocaleDateString()}
               </p>
@@ -131,26 +120,24 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
           </div>
 
           {/* Payment */}
-          {booking.payments && booking.payments.length > 0 && (
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
-                <CreditCard className="h-4 w-4 text-primary" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">Payment</p>
-                <p className="font-medium text-sm">₹{booking.payments[0]?.amount || 0}</p>
-                <Badge
-                  variant={booking.payments[0]?.payment_status === "completed" ? "default" : "secondary"}
-                  className="text-xs mt-1"
-                >
-                  {booking.payments[0]?.payment_status || "pending"}
-                </Badge>
-              </div>
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-primary/10 flex-shrink-0">
+              <CreditCard className="h-4 w-4 text-primary" />
             </div>
-          )}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted-foreground">Payment</p>
+              <p className="font-medium text-sm">₹{booking.amount || 0}</p>
+              <Badge
+                variant={booking.payment_status === "completed" ? "default" : "secondary"}
+                className="text-xs mt-1"
+              >
+                {booking.payment_status || "pending"}
+              </Badge>
+            </div>
+          </div>
         </div>
 
-        {/* Token and Actions */}
+        {/* Token */}
         {tokenCode && (
           <div className="pt-4 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
@@ -159,6 +146,7 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
                 {tokenCode}
               </p>
             </div>
+
             <div className="flex gap-2 w-full sm:w-auto">
               {onShowQR && (
                 <Button
@@ -168,9 +156,10 @@ export function BookingCard({ booking, onViewDetails, onShowQR, className }: Boo
                   className="flex-1 sm:flex-none"
                 >
                   <QrCode className="mr-2 h-4 w-4" />
-                  <span className="sm:inline">Show QR</span>
+                  Show QR
                 </Button>
               )}
+
               {onViewDetails && (
                 <Button
                   variant="outline"

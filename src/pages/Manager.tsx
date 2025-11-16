@@ -3,13 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase as rawSupabase } from "@/integrations/supabase/client";
 const supabase = rawSupabase as any;
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Calendar, Users as UsersIcon, Car, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 import Header from "@/components/Header";
+
 import StaffTab from "@/components/admin/StaffTab";
 import BookingsTab from "@/components/admin/BookingsTab";
+import UsersTab from "@/components/admin/UsersTab";
+
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ManagerStats {
   centreName: string;
@@ -25,6 +30,9 @@ export default function Manager() {
   const { hasRole, isAuthenticated, loading: authLoading, user } = useAuth();
   const [statsLoading, setStatsLoading] = useState(true);
   const [centreId, setCentreId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState("bookings");
+
   const [stats, setStats] = useState<ManagerStats>({
     centreName: "",
     totalStaff: 0,
@@ -33,93 +41,77 @@ export default function Manager() {
     activeBookings: 0,
     todayRevenue: 0,
   });
-  const [initialized, setInitialized] = useState(false); // ✅ add this
 
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-  if (authLoading || initialized) return;
+    if (authLoading || initialized) return;
 
-  if (!isAuthenticated) {
-    navigate("/auth");
-    return;
-  }
-
-  if (!hasRole("manager")) {
-    toast.error("Access denied. Manager privileges required.");
-    navigate("/dashboard");
-    return;
-  }
-
-  const init = async () => {
-    try {
-      await checkManagerStatus();
-    } catch (e) {
-      console.error("Initialization error:", e);
-      setStatsLoading(false);
-    } finally {
-      setInitialized(true); // ✅ ensures this runs once
-    }
-  };
-
-  init();
-}, [authLoading, isAuthenticated, hasRole]);
-
-
-
-
-  const checkManagerStatus = async () => {
-  try {
-    if (centreId) return; // ✅ Prevent re-fetch loop
-
-    const { data: managerData, error: managerError } = await supabase
-      .from("parking_centre_managers")
-      .select("centre_id")
-      .eq("user_id", user?.id)
-      .maybeSingle();
-
-    if (managerError) {
-  console.error("❌ Manager fetch error details:", managerError.message || managerError);
-  toast.error(`Error fetching manager data: ${managerError.message}`);
-  setStatsLoading(false);
-  return;
-}
-
-
-    if (!managerData) {
-      console.warn("No centre assigned to this manager yet");
-      toast.info("No parking centre assigned to your account");
-      setStatsLoading(false);
+    if (!isAuthenticated) {
+      navigate("/auth");
       return;
     }
 
-    // ✅ Fetch centre name separately to avoid broken join
-    const { data: centreData, error: centreError } = await supabase
-      .from("parking_centres")
-      .select("name")
-      .eq("id", managerData.centre_id)
-      .maybeSingle();
-
-    if (centreError) {
-      console.error("Error fetching centre name:", centreError);
+    if (!hasRole("manager")) {
+      toast.error("Access denied. Manager privileges required.");
+      navigate("/dashboard");
+      return;
     }
 
-    const centreName = centreData?.name || "Unknown Centre";
+    const init = async () => {
+      try {
+        await checkManagerStatus();
+      } catch (e) {
+        setStatsLoading(false);
+      } finally {
+        setInitialized(true);
+      }
+    };
 
-    setCentreId(managerData.centre_id);
-    await fetchStats(managerData.centre_id, centreName);
-    setStatsLoading(false);
-  } catch (error) {
-    console.error("Error checking manager status:", error);
-    setStatsLoading(false);
-  }
-};
+    init();
+  }, [authLoading, isAuthenticated, hasRole]);
 
+  const checkManagerStatus = async () => {
+    try {
+      if (centreId) return;
 
+      const { data: managerData, error } = await supabase
+        .from("parking_centre_managers")
+        .select("centre_id")
+        .eq("user_id", user?.id)
+        .maybeSingle();
 
+      if (error) {
+        toast.error("Error fetching manager data");
+        setStatsLoading(false);
+        return;
+      }
+
+      if (!managerData) {
+        toast.info("No parking centre assigned to your account");
+        setStatsLoading(false);
+        return;
+      }
+
+      const { data: centreData } = await supabase
+        .from("parking_centres")
+        .select("name")
+        .eq("id", managerData.centre_id)
+        .maybeSingle();
+
+      const centreName = centreData?.name || "Unknown Centre";
+
+      setCentreId(managerData.centre_id);
+      await fetchStats(managerData.centre_id, centreName);
+
+      setStatsLoading(false);
+    } catch (error) {
+      setStatsLoading(false);
+    }
+  };
 
   const fetchStats = async (centreId: string, centreName: string) => {
     try {
-      // Get parking zones for this centre
       const { data: zones } = await supabase
         .from("parking_zones")
         .select("id")
@@ -127,7 +119,6 @@ export default function Manager() {
 
       const zoneIds = zones?.map(z => z.id) || [];
 
-      // Fetch slots first
       const { data: slotsData, count: slotsCount } = await supabase
         .from("parking_slots")
         .select("id, status", { count: "exact" })
@@ -135,28 +126,22 @@ export default function Manager() {
 
       const slotIds = slotsData?.map(s => s.id) || [];
 
-      // Fetch remaining stats in parallel
       const [staff, bookings, payments] = await Promise.all([
-  supabase.from("staff").select("id", { count: "exact", head: true }).eq("centre_id", centreId),
-  supabase.from("bookings").select("id, status, slot_id, created_at").in("slot_id", slotIds),
-  supabase.from("payments").select("amount, created_at").eq("payment_status", "completed"),
-]);
-
-if (staff.error) {
-  console.error("❌ Staff fetch error:", staff.error.message);
-  toast.error(`Failed to load staff: ${staff.error.message}`);
-}
-
+        supabase.from("staff").select("id", { count: "exact", head: true }).eq("centre_id", centreId),
+        supabase.from("bookings").select("id, status, slot_id, created_at").in("slot_id", slotIds),
+        supabase.from("payments").select("amount, created_at").eq("payment_status", "completed")
+      ]);
 
       const availableSlots = slotsData?.filter(s => s.status === "available").length || 0;
       const activeBookings = bookings.data?.filter(b => b.status === "active").length || 0;
-      
-      // Calculate today's revenue
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayRevenue = payments.data
-        ?.filter(p => new Date(p.created_at) >= today)
-        .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+
+      const todayRevenue =
+        payments.data
+          ?.filter(p => new Date(p.created_at) >= today)
+          .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
       setStats({
         centreName,
@@ -167,110 +152,104 @@ if (staff.error) {
         todayRevenue,
       });
     } catch (error) {
-      console.error("Error fetching stats:", error);
       toast.error("Failed to load statistics");
     }
+  };
+
+  const fadeUp = {
+    hidden: { opacity: 0, y: 25 },
+    visible: { opacity: 1, y: 0 }
   };
 
   if (authLoading || statsLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Header />
-        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-center h-[calc(100vh-4rem)]"
+        >
           <p className="text-muted-foreground">Loading...</p>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  if (!isAuthenticated || !hasRole("manager")) return null;
-
-if (!centreId && !statsLoading) {
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <p className="text-muted-foreground">No parking centre assigned to your account</p>
-    </div>
-  );
-}
-
-
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 pt-24 pb-8">
-        <div className="mb-8">
+
+      <motion.main
+        initial="hidden"
+        animate="visible"
+        variants={{ visible: { transition: { staggerChildren: 0.15 } } }}
+        className="container mx-auto px-4 pt-24 pb-8"
+      >
+        <motion.div variants={fadeUp} className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Manager Dashboard</h1>
           <p className="text-muted-foreground">{stats.centreName}</p>
-        </div>
+        </motion.div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-              <UsersIcon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalStaff}</div>
-            </CardContent>
-          </Card>
+        <motion.div
+          variants={fadeUp}
+          className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8"
+        >
+          {[ 
+            { title: "Total Staff", value: stats.totalStaff, icon: UsersIcon },
+            { title: "Active Bookings", value: stats.activeBookings, icon: Calendar },
+            { title: "Today's Revenue", value: `₹${stats.todayRevenue.toFixed(2)}`, icon: DollarSign },
+            { title: "Total Parking Slots", value: stats.totalSlots, icon: Car },
+            { title: "Available Slots", value: stats.availableSlots, icon: Building2 }
+          ].map((item, i) => (
+            <motion.div key={i} variants={fadeUp}>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
+                  <item.icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{item.value}</div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </motion.div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Bookings</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeBookings}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₹{stats.todayRevenue.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Parking Slots</CardTitle>
-              <Car className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalSlots}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Available Slots</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.availableSlots}</div>
-              <p className="text-xs text-muted-foreground">of {stats.totalSlots} total</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="bookings" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="staff">Staff</TabsTrigger>
+            <TabsTrigger value="users">Users</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="bookings">
-            <BookingsTab centreId={centreId} readOnly={true} />
-          </TabsContent>
-
-          <TabsContent value="staff">
-            <StaffTab />
-          </TabsContent>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              transition={{ duration: 0.25 }}
+            >
+              {activeTab === "bookings" && (
+                <TabsContent value="bookings">
+                  <BookingsTab centreId={centreId} readOnly={true} />
+                </TabsContent>
+              )}
+              {activeTab === "staff" && (
+                <TabsContent value="staff">
+                  <StaffTab />
+                </TabsContent>
+              )}
+              {activeTab === "users" && (
+                <TabsContent value="users">
+                  <UsersTab />
+                </TabsContent>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </Tabs>
-      </main>
+      </motion.main>
     </div>
   );
 }
